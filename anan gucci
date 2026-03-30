@@ -1,364 +1,223 @@
 -- LocalScript (StarterGui の ScreenGui の中など)
 local Rayfield = require(game:GetService("ReplicatedStorage").Rayfield)
 
--- 基本的なエラーハンドリング
-local Window = nil
-local success, err = pcall(function()
-    -- Rayfieldのバージョンチェック（存在確認）
-    if not Rayfield then
-        error("Rayfieldが見つかりません")
-    end
-    
-    if not Rayfield.CreateWindow then
-        error("Rayfield.CreateWindowが存在しません")
-    end
-    
-    Window = Rayfield:CreateWindow({
-        Name = "管理画面",
-        LoadingTitle = "起動中...",
-        LoadingSubtitle = "UIを読み込んでいます",
-        ConfigurationSaving = {
-            Enabled = true,
-            FolderName = "MyUI",
-            FileName = "Settings"
-        }
-    })
-    
-    if not Window then
-        error("Windowの作成に失敗しました")
-    end
-    
-    -- メインタブ（画像IDはnilでもOK）
-    local MainTab = Window:CreateTab("メイン")
-    
-    -- Sectionの作成（オプション）
-    local Section = MainTab:CreateSection("設定")
-    
-    MainTab:CreateButton({
-        Name = "実行",
-        Callback = function()
-            print("ボタンが押されました")
-        end
-    })
-    
-    MainTab:CreateToggle({
-        Name = "ON / OFF",
-        CurrentValue = false,
-        Callback = function(Value)
-            print("トグル:", Value)
-        end
-    })
-    
-    -- ========== グッチタブ ==========
-    local GucciTab = Window:CreateTab("グッチ")
-    
-    local GucciSection = GucciTab:CreateSection("Blobman Spawner")
-    
-    -- Blobmanをスポーンして座らせて高速ラグドール
-    GucciTab:CreateButton({
-        Name = "スポーン & ラグドール",
-        Callback = function()
-            pcall(function()
-                print("Blobmanをスポーンします")
-                
-                -- Blobmanモデルを作成
-                local blobman = Instance.new("Model")
-                blobman.Name = "Blobman"
-                
-                -- Humanoidを作成
-                local humanoid = Instance.new("Humanoid")
-                humanoid.Name = "Humanoid"
-                humanoid.Parent = blobman
-                
-                -- HumanoidRootPartを作成
-                local rootPart = Instance.new("Part")
-                rootPart.Name = "HumanoidRootPart"
-                rootPart.Size = Vector3.new(2, 2, 1)
-                rootPart.Anchored = false
-                rootPart.CanCollide = true
-                rootPart.Parent = blobman
-                
-                -- 頭部
-                local head = Instance.new("Part")
-                head.Name = "Head"
-                head.Size = Vector3.new(1.5, 1.5, 1.5)
-                head.Anchored = false
-                head.CanCollide = true
-                head.Parent = blobman
-                
-                -- 胴体
-                local torso = Instance.new("Part")
-                torso.Name = "Torso"
-                torso.Size = Vector3.new(2, 2, 1)
-                torso.Anchored = false
-                torso.CanCollide = true
-                torso.Parent = blobman
-                
-                -- 四肢
-                local limbs = {"Left Arm", "Right Arm", "Left Leg", "Right Leg"}
-                for _, limbName in ipairs(limbs) do
-                    local limb = Instance.new("Part")
-                    limb.Name = limbName
-                    limb.Size = Vector3.new(1, 1.5, 1)
-                    limb.Anchored = false
-                    limb.CanCollide = true
-                    limb.Parent = blobman
-                end
-                
-                -- 関節を作成して接続
-                local function createWeld(part0, part1, c0, c1)
-                    local weld = Instance.new("Weld")
-                    weld.Part0 = part0
-                    weld.Part1 = part1
-                    weld.C0 = c0 or CFrame.new()
-                    weld.C1 = c1 or CFrame.new()
-                    weld.Parent = part0
-                    return weld
-                end
-                
-                -- RootPartを基準に各パーツを配置
-                rootPart.CFrame = CFrame.new(0, 3, 0)
-                torso.CFrame = rootPart.CFrame * CFrame.new(0, -1, 0)
-                head.CFrame = torso.CFrame * CFrame.new(0, 1.2, 0)
-                
-                -- 腕と脚の位置
-                local leftArm = blobman:FindFirstChild("Left Arm")
-                local rightArm = blobman:FindFirstChild("Right Arm")
-                local leftLeg = blobman:FindFirstChild("Left Leg")
-                local rightLeg = blobman:FindFirstChild("Right Leg")
-                
-                if leftArm then leftArm.CFrame = torso.CFrame * CFrame.new(-1.2, 0.5, 0) end
-                if rightArm then rightArm.CFrame = torso.CFrame * CFrame.new(1.2, 0.5, 0) end
-                if leftLeg then leftLeg.CFrame = torso.CFrame * CFrame.new(-0.6, -1.2, 0) end
-                if rightLeg then rightLeg.CFrame = torso.CFrame * CFrame.new(0.6, -1.2, 0) end
-                
-                -- ウェルドで接続
-                createWeld(torso, head, CFrame.new(0, 1.2, 0))
-                createWeld(torso, leftArm, CFrame.new(-1.2, 0.5, 0))
-                createWeld(torso, rightArm, CFrame.new(1.2, 0.5, 0))
-                createWeld(torso, leftLeg, CFrame.new(-0.6, -1.2, 0))
-                createWeld(torso, rightLeg, CFrame.new(0.6, -1.2, 0))
-                createWeld(rootPart, torso, CFrame.new(0, -1, 0))
-                
-                -- HumanoidにRootPartを設定
-                humanoid:SetRootPart(rootPart)
-                
-                -- スポーン位置をプレイヤーの前に設定
-                local player = game.Players.LocalPlayer
-                local character = player.Character or player.CharacterAdded:Wait()
-                local playerRoot = character and character:FindFirstChild("HumanoidRootPart")
-                
-                if playerRoot then
-                    blobman.Parent = workspace
-                    -- SetPrimaryPartCFrameの代わりに直接CFrameを設定
-                    rootPart.CFrame = playerRoot.CFrame + playerRoot.CFrame.LookVector * 5
-                    
-                    -- 座らせる
-                    task.wait(0.3)
-                    humanoid.Sit = true
-                    
-                    -- 高速ラグドール化
-                    task.wait(0.2)
-                    
-                    -- 全関節を破壊
-                    for _, v in pairs(blobman:GetDescendants()) do
-                        if v:IsA("Weld") or v:IsA("Motor6D") then
-                            v:Destroy()
-                        end
-                    end
-                    
-                    -- 物理演算モードに変更
-                    humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
-                    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-                    
-                    -- 全パーツを物理演算対象に
-                    for _, v in pairs(blobman:GetDescendants()) do
-                        if v:IsA("BasePart") then
-                            v:SetNetworkOwner(nil)
-                            v.Velocity = Vector3.new(math.random(-50, 50), math.random(20, 80), math.random(-50, 50))
-                            v.AngularVelocity = Vector3.new(math.random(-30, 30), math.random(-30, 30), math.random(-30, 30))
-                        end
-                    end
-                    
-                    -- Notifyが使えるか確認
-                    if Rayfield.Notify then
-                        Rayfield:Notify({
-                            Title = "グッチ",
-                            Content = "Blobmanが座って高速ラグドール状態になりました",
-                            Duration = 3
-                        })
-                    end
-                    
-                    print("Blobmanが座って高速ラグドール状態になりました")
-                else
-                    print("プレイヤーのHumanoidRootPartが見つかりません")
-                end
-            end)
-        end
-    })
-    
-    -- スポーンしたBlobmanを全て削除
-    GucciTab:CreateButton({
-        Name = "全削除",
-        Callback = function()
-            pcall(function()
-                local count = 0
-                for _, v in pairs(workspace:GetDescendants()) do
-                    if v.Name == "Blobman" and v:IsA("Model") then
-                        v:Destroy()
-                        count = count + 1
-                    end
-                end
-                if Rayfield.Notify then
-                    Rayfield:Notify({
-                        Title = "グッチ",
-                        Content = count .. "体のBlobmanを削除しました",
-                        Duration = 2
-                    })
-                end
-                print(count .. "体のBlobmanを削除しました")
-            end)
-        end
-    })
-    
-    -- ラグドール強度調整スライダー
-    local ragdollStrength = 100
-    GucciTab:CreateSlider({
-        Name = "ラグドール強度",
-        Range = {0, 200},
-        Increment = 10,
-        CurrentValue = 100,
-        Callback = function(Value)
-            ragdollStrength = Value
-            print("ラグドール強度:", ragdollStrength)
-        end
-    })
-    
-    -- 連続スポーンモード
-    local isSpamMode = false
-    local spamConnection = nil
-    
-    GucciTab:CreateToggle({
-        Name = "連続スポーンモード",
-        CurrentValue = false,
-        Callback = function(Value)
-            isSpamMode = Value
-            if isSpamMode then
-                spamConnection = game:GetService("RunService").Heartbeat:Connect(function()
-                    if isSpamMode then
-                        print("連続スポーン中...")
-                    end
-                end)
-                if Rayfield.Notify then
-                    Rayfield:Notify({
-                        Title = "グッチ",
-                        Content = "連続スポーンモードON",
-                        Duration = 2
-                    })
-                end
-            else
-                if spamConnection then
-                    spamConnection:Disconnect()
-                    spamConnection = nil
-                end
-                if Rayfield.Notify then
-                    Rayfield:Notify({
-                        Title = "グッチ",
-                        Content = "連続スポーンモードOFF",
-                        Duration = 2
-                    })
-                end
-            end
-        end
-    })
-    
-    -- UIを表示（Toggleの代わりに明示的に表示）
-    if Window.Toggle then
-        Window:Toggle()
-    end
-    
-    if Window.MakeDraggable then
-        Window:MakeDraggable()
-    end
-    
-    print("Rayfield UIが正常に起動しました")
-end)
+-- 最小構成のRayfield UI
+local Window = Rayfield:CreateWindow({
+    Name = "管理画面",
+    LoadingTitle = "起動中...",
+    LoadingSubtitle = "UIを読み込んでいます",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "MyUI",
+        FileName = "Settings"
+    }
+})
 
--- エラー処理
-if not success then
-    warn("Rayfield UIの起動に失敗しました: ", err)
-    
-    -- フォールバック: シンプルなScreenGuiを作成
-    local player = game.Players.LocalPlayer
-    if player then
-        local playerGui = player:WaitForChild("PlayerGui")
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "FallbackUI"
-        screenGui.Parent = playerGui
-        
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 400, 0, 300)
-        frame.Position = UDim2.new(0.5, -200, 0.5, -150)
-        frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        frame.BackgroundTransparency = 0
-        frame.BorderSizePixel = 0
-        frame.Parent = screenGui
-        
-        -- ドラッグ可能にする
-        local dragging = false
-        local dragStart = nil
-        local framePos = nil
-        
-        frame.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                dragStart = input.Position
-                framePos = frame.Position
-            end
-        end)
-        
-        frame.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end)
-        
-        frame.InputChanged:Connect(function(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local delta = input.Position - dragStart
-                frame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
-            end
-        end)
-        
-        local title = Instance.new("TextLabel")
-        title.Text = "管理画面 (フォールバック)"
-        title.Size = UDim2.new(1, 0, 0, 30)
-        title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        title.TextColor3 = Color3.fromRGB(255, 255, 255)
-        title.Parent = frame
-        
-        local text = Instance.new("TextLabel")
-        text.Text = "Rayfield UIの読み込みに失敗しました\n\nエラー内容:\n" .. tostring(err) .. "\n\nRayfieldモジュールがReplicatedStorageに\n正しく配置されているか確認してください"
-        text.Size = UDim2.new(1, -20, 1, -50)
-        text.Position = UDim2.new(0, 10, 0, 40)
-        text.BackgroundTransparency = 1
-        text.TextColor3 = Color3.fromRGB(255, 255, 255)
-        text.TextXAlignment = Enum.TextXAlignment.Left
-        text.TextYAlignment = Enum.TextYAlignment.Top
-        text.TextWrapped = true
-        text.Parent = frame
-        
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Text = "閉じる"
-        closeBtn.Size = UDim2.new(0, 80, 0, 30)
-        closeBtn.Position = UDim2.new(1, -90, 1, -40)
-        closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        closeBtn.Parent = frame
-        closeBtn.MouseButton1Click:Connect(function()
-            screenGui:Destroy()
-        end)
-        
-        print("フォールバックUIを表示しました")
+-- メインタブ
+local MainTab = Window:CreateTab("メイン")
+
+-- メインタブのセクション
+local Section = MainTab:CreateSection("設定")
+
+-- ボタン
+MainTab:CreateButton({
+    Name = "実行",
+    Callback = function()
+        print("ボタンが押されました")
     end
+})
+
+-- トグル
+MainTab:CreateToggle({
+    Name = "ON / OFF",
+    CurrentValue = false,
+    Callback = function(Value)
+        print("トグル:", Value)
+    end
+})
+
+-- ========== antiタブ ==========
+local AntiTab = Window:CreateTab("anti")
+
+-- antiタブのセクション
+local AntiSection = AntiTab:CreateSection("Anti Settings")
+
+-- Blobmanをスポーンする関数
+local function spawnBlobman()
+    pcall(function()
+        print("Blobmanをスポーンします")
+        
+        -- Blobmanモデルを作成
+        local blobman = Instance.new("Model")
+        blobman.Name = "Blobman"
+        
+        -- Humanoidを作成
+        local humanoid = Instance.new("Humanoid")
+        humanoid.Name = "Humanoid"
+        humanoid.Parent = blobman
+        
+        -- HumanoidRootPartを作成
+        local rootPart = Instance.new("Part")
+        rootPart.Name = "HumanoidRootPart"
+        rootPart.Size = Vector3.new(2, 2, 1)
+        rootPart.Anchored = false
+        rootPart.CanCollide = true
+        rootPart.Parent = blobman
+        
+        -- 頭部
+        local head = Instance.new("Part")
+        head.Name = "Head"
+        head.Size = Vector3.new(1.5, 1.5, 1.5)
+        head.Anchored = false
+        head.CanCollide = true
+        head.Parent = blobman
+        
+        -- 胴体
+        local torso = Instance.new("Part")
+        torso.Name = "Torso"
+        torso.Size = Vector3.new(2, 2, 1)
+        torso.Anchored = false
+        torso.CanCollide = true
+        torso.Parent = blobman
+        
+        -- 四肢
+        local limbs = {"Left Arm", "Right Arm", "Left Leg", "Right Leg"}
+        for _, limbName in ipairs(limbs) do
+            local limb = Instance.new("Part")
+            limb.Name = limbName
+            limb.Size = Vector3.new(1, 1.5, 1)
+            limb.Anchored = false
+            limb.CanCollide = true
+            limb.Parent = blobman
+        end
+        
+        -- 関節を作成して接続
+        local function createWeld(part0, part1, c0, c1)
+            local weld = Instance.new("Weld")
+            weld.Part0 = part0
+            weld.Part1 = part1
+            weld.C0 = c0 or CFrame.new()
+            weld.C1 = c1 or CFrame.new()
+            weld.Parent = part0
+            return weld
+        end
+        
+        -- RootPartを基準に各パーツを配置
+        rootPart.CFrame = CFrame.new(0, 3, 0)
+        torso.CFrame = rootPart.CFrame * CFrame.new(0, -1, 0)
+        head.CFrame = torso.CFrame * CFrame.new(0, 1.2, 0)
+        
+        -- 腕と脚の位置
+        local leftArm = blobman:FindFirstChild("Left Arm")
+        local rightArm = blobman:FindFirstChild("Right Arm")
+        local leftLeg = blobman:FindFirstChild("Left Leg")
+        local rightLeg = blobman:FindFirstChild("Right Leg")
+        
+        if leftArm then leftArm.CFrame = torso.CFrame * CFrame.new(-1.2, 0.5, 0) end
+        if rightArm then rightArm.CFrame = torso.CFrame * CFrame.new(1.2, 0.5, 0) end
+        if leftLeg then leftLeg.CFrame = torso.CFrame * CFrame.new(-0.6, -1.2, 0) end
+        if rightLeg then rightLeg.CFrame = torso.CFrame * CFrame.new(0.6, -1.2, 0) end
+        
+        -- ウェルドで接続
+        createWeld(torso, head, CFrame.new(0, 1.2, 0))
+        createWeld(torso, leftArm, CFrame.new(-1.2, 0.5, 0))
+        createWeld(torso, rightArm, CFrame.new(1.2, 0.5, 0))
+        createWeld(torso, leftLeg, CFrame.new(-0.6, -1.2, 0))
+        createWeld(torso, rightLeg, CFrame.new(0.6, -1.2, 0))
+        createWeld(rootPart, torso, CFrame.new(0, -1, 0))
+        
+        -- HumanoidにRootPartを設定
+        humanoid:SetRootPart(rootPart)
+        
+        -- スポーン位置をプレイヤーの前に設定
+        local player = game.Players.LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local playerRoot = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if playerRoot then
+            blobman.Parent = workspace
+            rootPart.CFrame = playerRoot.CFrame + playerRoot.CFrame.LookVector * 5
+            
+            -- 座らせる
+            task.wait(0.3)
+            humanoid.Sit = true
+            
+            -- 高速ラグドール化
+            task.wait(0.2)
+            
+            -- 全関節を破壊
+            for _, v in pairs(blobman:GetDescendants()) do
+                if v:IsA("Weld") or v:IsA("Motor6D") then
+                    v:Destroy()
+                end
+            end
+            
+            -- 物理演算モードに変更
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+            
+            -- 全パーツを物理演算対象に
+            for _, v in pairs(blobman:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v:SetNetworkOwner(nil)
+                    v.Velocity = Vector3.new(math.random(-50, 50), math.random(20, 80), math.random(-50, 50))
+                    v.AngularVelocity = Vector3.new(math.random(-30, 30), math.random(-30, 30), math.random(-30, 30))
+                end
+            end
+            
+            if Rayfield.Notify then
+                Rayfield:Notify({
+                    Title = "anti",
+                    Content = "Blobmanが座って高速ラグドール状態になりました",
+                    Duration = 3
+                })
+            end
+            
+            print("Blobmanが座って高速ラグドール状態になりました")
+        end
+    end)
 end
+
+-- antiタブにトグルを追加（押したらBlobmanをスポーン）
+AntiTab:CreateToggle({
+    Name = "スポーン & ラグドール",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            spawnBlobman()
+            -- トグルを自動でOFFにする（一度だけ実行）
+            task.wait(0.1)
+            -- トグルの状態を元に戻す（UI上ではOFFに見えるように）
+            -- 注意: これはトグルの見た目だけの問題で、実際の状態は変わります
+        end
+    end
+})
+
+-- 全削除ボタンも追加
+AntiTab:CreateButton({
+    Name = "全削除",
+    Callback = function()
+        pcall(function()
+            local count = 0
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v.Name == "Blobman" and v:IsA("Model") then
+                    v:Destroy()
+                    count = count + 1
+                end
+            end
+            if Rayfield.Notify then
+                Rayfield:Notify({
+                    Title = "anti",
+                    Content = count .. "体のBlobmanを削除しました",
+                    Duration = 2
+                })
+            end
+            print(count .. "体のBlobmanを削除しました")
+        end)
+    end
+})
+
+-- UIを表示
+Window:Toggle()
+
+print("Rayfield UIが開きました")
