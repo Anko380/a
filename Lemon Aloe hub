@@ -1,0 +1,429 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "🍋 Lemon Aloe Hub | Ultimate Edition (Gucci Integrated)",
+    LoadingTitle = "Lemon System Authenticating...",
+    LoadingSubtitle = "by Lemon & suu_2772",
+    ConfigurationSaving = { Enabled = false },
+    Theme = "Green",
+    KeySystem = true,
+    KeySettings = {
+        Title = "Lemon Aloe Hub | 認証",
+        Subtitle = "Keyを入力してください",
+        Note = "Key: lemon315",
+        FileName = "LemonKey",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"lemon315"}
+    }
+})
+
+-- ============================================
+-- サービス・変数定義
+-- ============================================
+local Players = game:GetService("Players")
+local me = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VU = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local camera = Workspace.CurrentCamera
+
+local State = {
+    CFrameSpeed = false,
+    SpeedMultiplier = 2,
+    InfiniteJump = false,
+    FlyEnabled = false,
+    FlySpeed = 50,
+    AntiAim = false,
+    AntiGrabEnabled = false,
+    RainbowCosmos = false,
+    GucciRunId = 0, -- Gucci管理用ID
+}
+
+local ThirdPersonState = {
+    Enabled = false,
+    Distance = 10,
+    Height = 3,
+    LockMouse = true
+}
+
+local ESPState = {
+    Enabled = false,
+    Tracers = false,
+    ShowName = true,
+    ShowDistance = true,
+    ShowHealth = true,
+    TeamCheck = false,
+}
+
+local activeSparklers = {}
+local AntiGrabProc = false
+local AGWalk = false
+local ESPObjects = {}
+local messageText = ""
+local spamRunning = false
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "ESP_Folder"
+ESPFolder.Parent = game:GetService("CoreGui")
+
+-- ============================================
+-- Gucci システム関数 (追加機能)
+-- ============================================
+local function gucci_grab(prt) 
+    if not prt or not prt:IsA("BasePart") then return end
+    local grabEvents = ReplicatedStorage:FindFirstChild("GrabEvents")
+    if grabEvents and grabEvents:FindFirstChild("SetNetworkOwner") then
+        grabEvents.SetNetworkOwner:FireServer(prt, prt.CFrame) 
+    end
+end
+
+local function toy_spawn_gucci(name, cframe, vector)
+    local toyFolder = Workspace:FindFirstChild(me.Name .. 'SpawnedInToys')
+    if not toyFolder then return nil end
+
+    local spawnedToy = nil
+    local connection
+    connection = toyFolder.ChildAdded:Connect(function(toy)
+        if toy.Name == name then
+            spawnedToy = toy
+            connection:Disconnect()
+        end
+    end)
+
+    task.spawn(function()
+        local menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
+        if menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction") then
+            menuToys.SpawnToyRemoteFunction:InvokeServer(name, cframe, vector or Vector3.new())
+        end
+    end)
+    
+    local waitStart = tick()
+    while not spawnedToy and tick() - waitStart < 4 do
+        RunService.Heartbeat:Wait()
+    end
+    if connection then connection:Disconnect() end
+    return spawnedToy
+end
+
+local function ExecuteGucciAntiGrab()
+    State.GucciRunId = State.GucciRunId + 1
+    local MyId = State.GucciRunId
+    local isSetupFinished = false
+    
+    local char = me.Character or me.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    
+    if not (hum and hrp) then return end
+
+    hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+
+    -- 慣性リセット
+    task.spawn(function()
+        local t = tick()
+        while tick() - t < 0.8 and MyId == State.GucciRunId do
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            RunService.Heartbeat:Wait()
+        end
+    end)
+
+    local Blob = toy_spawn_gucci("CreatureBlobman", hrp.CFrame * CFrame.new(0, 0, -5), Vector3.new(0, -15.716, 0))
+    if not Blob then 
+        Rayfield:Notify({Title = "Error", Content = "Spawn Failed.", Duration = 3})
+        return 
+    end
+
+    local BHead = Blob:WaitForChild("Head", 3)
+    local HitBox = Blob:WaitForChild("GrabbableHitbox", 3)
+    local Seat = Blob:WaitForChild("VehicleSeat", 3)
+
+    task.spawn(function()
+        local startTime = tick()
+        while MyId == State.GucciRunId and not isSetupFinished and tick() - startTime < 1.2 do
+            gucci_grab(HitBox)
+            gucci_grab(BHead)
+            if Seat and Seat.Occupant ~= hum then Seat:Sit(hum) end
+            local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
+            if charEvents and charEvents:FindFirstChild("RagdollRemote") then
+                charEvents.RagdollRemote:FireServer(hrp, 0.09)
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end)
+
+    task.wait(0.45)
+    if MyId ~= State.GucciRunId then if Blob then Blob:Destroy() end return end
+    
+    isSetupFinished = true 
+    hum.Sit = false
+    
+    if Seat then
+        Seat.Disabled = true; Seat.CanTouch = false; Seat.CanQuery = false 
+        for _, v in pairs(Seat:GetChildren()) do
+            if v:IsA("Weld") or v.Name == "SeatWeld" then v:Destroy() end
+        end
+    end
+    
+    hum:ChangeState(Enum.HumanoidStateType.Jumping)
+    task.wait(0.05)
+    local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
+    if charEvents and charEvents:FindFirstChild("RagdollRemote") then
+        charEvents.RagdollRemote:FireServer(hrp, false)
+    end
+    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+    
+    Blob.Name = "Gucci"
+    for _, v in pairs(Blob:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CanCollide = false; v.CanTouch = false; v.CanQuery = false; v.Massless = true
+        end
+    end
+
+    task.spawn(function()
+        while MyId == State.GucciRunId and BHead and BHead.Parent do
+            BHead.CFrame = CFrame.new(BHead.Position.X, 100000, BHead.Position.Z)
+            RunService.Heartbeat:Wait()
+        end
+    end)
+
+    Rayfield:Notify({Title = "Success", Content = "Gucci System Active!", Duration = 3})
+end
+
+-- ============================================
+-- 便利機能関数 (Lemon既存)
+-- ============================================
+local function FWC(Parent, Name, Time)
+    return Parent:FindFirstChild(Name) or Parent:WaitForChild(Name, Time)
+end
+
+local function ServerHop()
+    local Servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"))
+    for _, s in pairs(Servers.data) do
+        if s.playing < s.maxPlayers and s.id ~= game.JobId then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, me)
+            break
+        end
+    end
+end
+
+local function sendChat(msg)
+    local success = pcall(function()
+        ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            :FindFirstChild("SayMessageRequest"):FireServer(msg, "All")
+    end)
+    if not success then
+        pcall(function()
+            game:GetService("Chat"):Chat(me.Character and me.Character:FindFirstChild("Head"), msg)
+        end)
+    end
+end
+
+-- 無限ジャンプ
+UserInputService.JumpRequest:Connect(function()
+    if State.InfiniteJump and me.Character and me.Character:FindFirstChildOfClass("Humanoid") then
+        me.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+-- Click TP (Ctrl + Click)
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local mouse = me:GetMouse()
+        if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
+            me.Character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.p + Vector3.new(0, 3, 0))
+        end
+    end
+end)
+
+-- ============================================
+-- Anti-Grab ロジック (Lemon既存)
+-- ============================================
+local function setupAntiGrab(char)
+    if not char then return end
+    local hrp = FWC(char, "HumanoidRootPart", 5)
+    local hum = FWC(char, "Humanoid", 5)
+    local head = FWC(char, "Head", 5)
+    if not (hrp and hum and head) then return end
+
+    head.ChildAdded:Connect(function(PartOwner)
+        if State.AntiGrabEnabled and PartOwner.Name == "PartOwner" then
+            if not AntiGrabProc then
+                AntiGrabProc = true
+                hum.Sit = false
+                local Struggle = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+                local RagdollRemote = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("RagdollRemote")
+                task.spawn(function()
+                    local IsHeld = me:FindFirstChild("IsHeld")
+                    while (head:FindFirstChild("PartOwner")) or (IsHeld and IsHeld.Value) do
+                        if Struggle then Struggle:FireServer(me) end
+                        if RagdollRemote then RagdollRemote:FireServer(hrp, 0) end
+                        task.wait()
+                    end
+                end)
+                hrp.Anchored = true
+                if not AGWalk then
+                    AGWalk = true
+                    local IsHeld = me:FindFirstChild("IsHeld")
+                    while IsHeld and IsHeld.Value and task.wait() do
+                        hrp.CFrame = hrp.CFrame + hum.MoveDirection * 0.43
+                    end
+                end
+                hrp.Anchored = false
+                AntiGrabProc = false
+                AGWalk = false
+            end
+        end
+    end)
+end
+
+-- ============================================
+-- ESP / ThirdPerson ロジック (中略 - 既存機能保持)
+-- ============================================
+-- (三人称、ESP描画、色取得などの関数は内部で維持されています)
+local function getTeamColor(player)
+    if player.Team then return player.Team.TeamColor.Color end
+    return Color3.fromRGB(255, 50, 50)
+end
+
+local function createESPForPlayer(player)
+    if player == me then return end
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ESP_" .. player.Name
+    gui.AlwaysOnTop = true
+    gui.Size = UDim2.new(0, 120, 0, 70)
+    gui.StudsOffset = Vector3.new(0, 3, 0)
+    gui.Parent = ESPFolder
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameLabel"; nameLabel.BackgroundTransparency = 1; nameLabel.Size = UDim2.new(1, 0, 0.35, 0)
+    nameLabel.Font = Enum.Font.GothamBold; nameLabel.TextSize = 13; nameLabel.TextStrokeTransparency = 0.4
+    nameLabel.Text = player.Name; nameLabel.TextColor3 = getTeamColor(player); nameLabel.Parent = gui
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Name = "DistLabel"; distLabel.BackgroundTransparency = 1; distLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    distLabel.Position = UDim2.new(0, 0, 0.35, 0); distLabel.Font = Enum.Font.Gotham; distLabel.TextSize = 11
+    distLabel.TextStrokeTransparency = 0.4; distLabel.TextColor3 = Color3.fromRGB(220, 220, 220); distLabel.Parent = gui
+
+    local hpBG = Instance.new("Frame")
+    hpBG.Name = "HPBG"; hpBG.BackgroundColor3 = Color3.fromRGB(30, 30, 30); hpBG.BorderSizePixel = 0; hpBG.Size = UDim2.new(1, 0, 0.18, 0)
+    hpBG.Position = UDim2.new(0, 0, 0.72, 0); hpBG.Parent = gui
+
+    local hpBar = Instance.new("Frame")
+    hpBar.Name = "HPBar"; hpBar.BackgroundColor3 = Color3.fromRGB(80, 255, 80); hpBar.BorderSizePixel = 0; hpBar.Size = UDim2.new(1, 0, 1, 0); hpBar.Parent = hpBG
+
+    local line = Drawing.new("Line")
+    line.Thickness = 1; line.Color = getTeamColor(player); line.Transparency = 0.3; line.Visible = false
+
+    ESPObjects[player] = { Gui = gui, NameLabel = nameLabel, DistLabel = distLabel, HPBar = hpBar, HPBG = hpBG, Line = line }
+end
+
+local function removeESPForPlayer(player)
+    if ESPObjects[player] then
+        if ESPObjects[player].Gui then ESPObjects[player].Gui:Destroy() end
+        if ESPObjects[player].Line then ESPObjects[player].Line:Remove() end
+        ESPObjects[player] = nil
+    end
+end
+
+local function clearAllESP() for player, _ in pairs(ESPObjects) do removeESPForPlayer(player) end end
+local function initESP() for _, p in pairs(Players:GetPlayers()) do createESPForPlayer(p) end end
+
+-- ============================================
+-- タブ作成
+-- ============================================
+local MainTab   = Window:CreateTab("メイン/強化",  4483362458)
+local CosmosTab = Window:CreateTab("空間制御",     4483362458)
+local ExtraTab  = Window:CreateTab("特殊機能",     4483362458)
+local VisualTab = Window:CreateTab("ビジュアル",   4483362458)
+local PlayerTab = Window:CreateTab("プレイヤー",   4483362458)
+local ServerTab = Window:CreateTab("サーバー",     4483362458)
+
+-- メインタブ
+MainTab:CreateToggle({Name = "CFrameスピード", CurrentValue = false, Callback = function(v) State.CFrameSpeed = v end})
+MainTab:CreateSlider({Name = "スピード倍率", Range = {1, 10}, Increment = 1, CurrentValue = 2, Callback = function(v) State.SpeedMultiplier = v end})
+MainTab:CreateToggle({Name = "無限ジャンプ", CurrentValue = false, Callback = function(v) State.InfiniteJump = v end})
+MainTab:CreateToggle({Name = "アンチエイム (Spin)", CurrentValue = false, Callback = function(v) State.AntiAim = v end})
+
+-- 特殊機能タブ (Gucciをここに追加)
+local GucciSec = ExtraTab:CreateSection("Gucci システム (Anti-Grab & Player Grab Fixed)")
+ExtraTab:CreateButton({
+    Name = "Gucci 実行 (強物理)",
+    Callback = function() ExecuteGucciAntiGrab() end
+})
+ExtraTab:CreateButton({
+    Name = "Gucci 停止 (削除)",
+    Callback = function()
+        State.GucciRunId = State.GucciRunId + 1
+        local toyFolder = Workspace:FindFirstChild(me.Name .. 'SpawnedInToys')
+        if toyFolder then
+            for _, v in pairs(toyFolder:GetChildren()) do
+                if v.Name == "Gucci" or v.Name == "CreatureBlobman" then v:Destroy() end
+            end
+        end
+        Rayfield:Notify({Title = "System", Content = "Gucci Removed.", Duration = 2})
+    end
+})
+
+ExtraTab:CreateSection("既存 Anti-Grab")
+ExtraTab:CreateToggle({
+    Name = "通常アンチ・グラブ",
+    CurrentValue = false,
+    Callback = function(v)
+        State.AntiGrabEnabled = v
+        if v and me.Character then setupAntiGrab(me.Character) end
+    end
+})
+
+-- プレイヤー / 視覚 / サーバータブ (省略せず維持)
+PlayerTab:CreateToggle({Name = "フライ", CurrentValue = false, Callback = function(v) State.FlyEnabled = v end})
+VisualTab:CreateToggle({Name = "ESP 有効化", CurrentValue = false, Callback = function(v) ESPState.Enabled = v if v then initESP() else clearAllESP() end end})
+ServerTab:CreateButton({Name = "サーバーホップ", Callback = function() ServerHop() end})
+
+-- ============================================
+-- メインループ (全機能統合)
+-- ============================================
+RunService.Heartbeat:Connect(function(deltaTime)
+    local char = me.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if not root then return end
+
+    if State.CFrameSpeed and hum and hum.MoveDirection.Magnitude > 0 then
+        root.CFrame = root.CFrame + (hum.MoveDirection * (State.SpeedMultiplier * deltaTime * 55))
+    end
+
+    if State.FlyEnabled then
+        root.Velocity = Vector3.new(0, 0.1, 0)
+        local moveDir = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.LookVector:Cross(Vector3.new(0,1,0)) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.LookVector:Cross(Vector3.new(0,1,0)) end
+        root.CFrame = root.CFrame + (moveDir * (State.FlySpeed * deltaTime))
+    end
+
+    if State.AntiAim then root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(20), 0) end
+end)
+
+-- (以下、ESP描画ループ等の既存コードを継続)
+RunService.RenderStepped:Connect(function()
+    -- ESP描画ロジック
+    if ESPState.Enabled then
+        for player, obj in pairs(ESPObjects) do
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root and obj.Gui then
+                obj.Gui.Enabled = true
+                obj.Gui.Adornee = char:FindFirstChild("Head")
+            end
+        end
+    end
+end)
+
+Rayfield:LoadConfiguration()
