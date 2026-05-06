@@ -1,308 +1,129 @@
--- [[ Lemon Hub Professional Edition ]]
--- Orion Libraryのロード
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
+-- [[ ELITE MASS ELIMINATION OS v6.8 - SURGICAL STRIKE ]] --
+-- Architect: あ (Top 0.1% Engineer)
+-- Optimization: Conflict-Free Physics Sync & Packet Prioritization
 
--- ウィンドウ作成
-local Window = OrionLib:MakeWindow({
-    Name = "lemon hub", 
-    HidePremium = false, 
-    SaveConfig = true, 
-    ConfigFolder = "OrionTest"
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- // 内部変数
+local State = {
+    Active = false,
+}
+
+local SETTINGS = {
+    MAX_ATTACK_FRAMES = 8, -- スピード維持
+    OFFSET = CFrame.new(0, 0, 2.35) -- 物理競合を避ける最適距離
+}
+
+-- // 高度な生存確認
+local function IsValidTarget(player)
+    if player == LocalPlayer then return false end
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    return char and root and hum and hum.Health > 0 and char.Parent == workspace
+end
+
+-- // 外科的精度・殲滅ロジック
+local function ExecuteSurgicalKill()
+    local GE = ReplicatedStorage:WaitForChild("GrabEvents", 5)
+    if not GE then return end
+
+    while State.Active do
+        local survivors = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if IsValidTarget(p) then table.insert(survivors, p) end
+        end
+
+        for _, target in ipairs(survivors) do
+            if not State.Active then break end
+            
+            local myChar = LocalPlayer.Character
+            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+            if IsValidTarget(target) and myRoot then
+                local tChar = target.Character
+                local tRoot = tChar.HumanoidRootPart
+                local tHum = tChar.Humanoid
+
+                -- // 超高速・高精度サイクル
+                for i = 1, SETTINGS.MAX_ATTACK_FRAMES do
+                    if not IsValidTarget(target) or not State.Active then break end
+                    
+                    -- 【精度向上】ターゲットの背後へ完全に「固定」
+                    myRoot.CFrame = tRoot.CFrame * SETTINGS.OFFSET
+                    
+                    -- 物理的反発を殺すためのベロシティ・アンカー
+                    myRoot.AssemblyLinearVelocity = Vector3.new(0, -1, 0) -- わずかに下に押し付ける
+                    myRoot.AssemblyAngularVelocity = Vector3.zero
+
+                    pcall(function()
+                        -- 物理権利を確実に上書き
+                        GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
+                        
+                        -- ステート操作（キル手法は完全維持）
+                        -- ターゲットのステートを毎フレームDeadに固定し、サーバーの回復を許さない
+                        tHum:ChangeState(Enum.HumanoidStateType.Dead)
+                        tHum.BreakJointsOnDeath = true
+                        
+                        -- 判定を「面」で作るための多重パケット
+                        GE.CreateGrabLine:FireServer(tRoot, Vector3.new(0, -200, 0), tRoot.Position, true)
+                        GE.CreateGrabLine:FireServer(tRoot, Vector3.new(0, 0, 0), tRoot.Position + Vector3.new(0,1,0), false)
+                        GE.DestroyGrabLine:FireServer(tRoot)
+                    end)
+                    
+                    RunService.Heartbeat:Wait()
+                end
+                -- 遷移スピード維持のため、位置復元は行わず即座に次のターゲットへ
+            end
+        end
+        
+        -- 全滅時はリソース節約
+        if #survivors == 0 then
+            RunService.Heartbeat:Wait()
+        end
+    end
+end
+
+-- // UI (v6.8)
+local Window = Rayfield:CreateWindow({
+    Name = "ELITE ADMIN CENTRAL v6.8",
+    LoadingTitle = "PRECISION OVERDRIVE LOADED",
+    LoadingSubtitle = "by あ (The Architect)",
+    ConfigurationSaving = { Enabled = false }
 })
 
--- ==========================================
--- サービスと変数の定義
--- ==========================================
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local MainTab = Window:CreateTab("Surgical Strike", 4483362458)
 
--- 共通ステート管理
-local State = {
-    AntiGrabEnabled = false,
-    FlyEnabled = false,
-    FlySpeed = 50,
-    CFrameSpeed = false,
-    SpeedMultiplier = 2,
-    InfiniteJump = false,
-    AntiAim = false,
-    ESPEnabled = false,
-    XrayEnabled = false
-}
+MainTab:CreateSection("Target Elimination")
 
-local AntiGrabProc = false
-local AGWalk = false
-local XrayParts = {}
-
-local function FWC(parent, name, timeout)
-    if not parent then return nil end
-    return parent:WaitForChild(name, timeout or 5)
-end
-
--- ==========================================
--- ロジック 1: 掴む (Grab) - 修正・統合版
--- ==========================================
-local nageru = 400
-local nageruEnabled = false
-local GrabMode = { 
-    Kill = false, Sky = false, Down = false, Noclip = false,
-    Kick = false, Void = false, Anchor = false 
-}
-
-Workspace.ChildAdded:Connect(function(model)
-    if model.Name == "GrabParts" then
-        task.wait()
-        local grabPart = model:FindFirstChild("GrabPart")
-        local weld = grabPart and grabPart:FindFirstChild("WeldConstraint")
-        local target = weld and weld.Part1
-        if not target then return end
-        local targetChar = target.Parent
-        
-        -- 自分自身を保護
-        if targetChar == LocalPlayer.Character then return end
-
-        local hrp = targetChar:FindFirstChild("HumanoidRootPart")
-        local hum = targetChar:FindFirstChild("Humanoid")
-        local isObject = not hum
-
-        -- [プレイヤー向け機能]
-        if GrabMode.Kill and hum then targetChar:BreakJoints() end
-        
-        local bv = Instance.new("BodyVelocity")
-        bv.MaxForce = Vector3.new(0, math.huge, 0)
-        bv.Parent = target
-        if GrabMode.Sky then bv.Velocity = Vector3.new(0, 20, 0)
-        elseif GrabMode.Down then bv.Velocity = Vector3.new(0, -20, 0)
-        else bv:Destroy() end
-
-        if GrabMode.Noclip then
-            for _, p in pairs(targetChar:GetChildren()) do
-                if p:IsA("BasePart") then p.CanCollide = false end
-            end
+MainTab:CreateToggle({
+    Name = "MASS KILL OVERDRIVE (High-Precision)",
+    CurrentValue = false,
+    Flag = "SurgicalToggle",
+    Callback = function(Value)
+        State.Active = Value
+        if State.Active then
+            task.spawn(ExecuteSurgicalKill)
+            Rayfield:Notify({
+                Title = "SYSTEM ON", 
+                Content = "Executing all targets with precision sync.", 
+                Duration = 2
+            })
         end
+    end,
+})
 
-        -- Kick Grab (引き戻し防止)
-        if GrabMode.Kick and hrp then
-            task.spawn(function()
-                while model.Parent == Workspace do
-                    hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    hrp.CFrame = CFrame.new(9e8, 9e8, 9e8)
-                    task.wait()
-                end
-            end)
-        end
+MainTab:CreateSection("Safety Unit")
 
-        -- Void Grab (引き戻し防止・強化版)
-        if GrabMode.Void and hrp then
-            task.spawn(function()
-                while model.Parent == Workspace do
-                    hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
-                    hrp.CFrame = CFrame.new(hrp.Position.X, -1500, hrp.Position.Z)
-                    task.wait()
-                end
-            end)
-        end
-
-        -- Anchor Grab (オブジェクト限定・再掴み対応)
-        if GrabMode.Anchor and isObject then
-            target.Anchored = false -- 掴み中は解除
-        end
-
-        -- 解除時の処理
-        model.AncestryChanged:Connect(function(_, parent)
-            if not parent then
-                if bv and bv.Parent then bv:Destroy() end
-                if nageruEnabled and target and target.Parent then
-                    local throwV = Instance.new("BodyVelocity")
-                    throwV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    throwV.Velocity = Camera.CFrame.LookVector * nageru
-                    throwV.Parent = target
-                    Debris:AddItem(throwV, 1)
-                end
-                if GrabMode.Noclip and targetChar then
-                    for _, p in pairs(targetChar:GetChildren()) do
-                        if p:IsA("BasePart") then p.CanCollide = true end
-                    end
-                end
-                
-                -- 離した瞬間にオブジェクトなら再固定
-                if GrabMode.Anchor and isObject and target then
-                    target.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    target.Anchored = true
-                end
-            end
-        end)
-    end
-end)
-
--- ==========================================
--- ロジック 2: アンチ掴み (Anti-Grab)
--- ==========================================
-local function setupAntiGrab(char) 
-    if not char then return end 
-    local hrp = FWC(char, "HumanoidRootPart") 
-    local hum = FWC(char, "Humanoid") 
-    local head = FWC(char, "Head") 
-    if not (hrp and hum and head) then return end 
-
-    head.ChildAdded:Connect(function(PartOwner) 
-        if State.AntiGrabEnabled and PartOwner.Name == "PartOwner" then 
-            if not AntiGrabProc then 
-                AntiGrabProc = true 
-                hum.Sit = false 
-                local charEvents = ReplicatedStorage:FindFirstChild("CharacterEvents")
-                local Struggle = charEvents and charEvents:FindFirstChild("Struggle") 
-                local RagdollRemote = charEvents and charEvents:FindFirstChild("RagdollRemote") 
-
-                task.spawn(function() 
-                    local IsHeld = char:FindFirstChild("IsHeld") 
-                    while (head:FindFirstChild("PartOwner")) or (IsHeld and IsHeld.Value) do 
-                        if Struggle then Struggle:FireServer(char) end 
-                        if RagdollRemote then RagdollRemote:FireServer(hrp, 0) end 
-                        task.wait() 
-                    end 
-                end) 
-
-                hrp.Anchored = true 
-                if not AGWalk then 
-                    AGWalk = true 
-                    local IsHeld = char:FindFirstChild("IsHeld") 
-                    while IsHeld and IsHeld.Value and task.wait() do 
-                        hrp.CFrame = hrp.CFrame + hum.MoveDirection * 0.43 
-                    end 
-                end 
-                hrp.Anchored = false 
-                AntiGrabProc = false 
-                AGWalk = false 
-            end 
-        end 
-    end) 
-end
-
-LocalPlayer.CharacterAdded:Connect(setupAntiGrab)
-if LocalPlayer.Character then setupAntiGrab(LocalPlayer.Character) end
-
--- ==========================================
--- ロジック 3: フライ, CFrame速度, アンチエイム, ESP, X-ray
--- ==========================================
-RunService.RenderStepped:Connect(function(deltaTime)
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChild("Humanoid")
-    
-    if hrp and hum then
-        if State.FlyEnabled then
-            local moveDir = hum.MoveDirection
-            hrp.Velocity = moveDir * State.FlySpeed
-            if moveDir.Magnitude == 0 then hrp.Velocity = Vector3.new(0, 0.1, 0) end
-        end
-        if State.CFrameSpeed and hum.MoveDirection.Magnitude > 0 then
-            hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (State.SpeedMultiplier * deltaTime * 50))
-        end
-        if State.AntiAim then
-            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(50), 0)
-        end
-    end
-
-    if State.ESPEnabled then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local char = p.Character
-                if not char:FindFirstChild("ESPHighlight") then
-                    local highlight = Instance.new("Highlight", char)
-                    highlight.Name = "ESPHighlight"
-                    highlight.FillColor = Color3.fromRGB(255, 0, 0)
-                end
-                if not char.Head:FindFirstChild("ESPName") then
-                    local bgui = Instance.new("BillboardGui", char.Head)
-                    bgui.Name = "ESPName"
-                    bgui.Size = UDim2.new(0, 200, 0, 50)
-                    bgui.Adornee = char.Head
-                    bgui.AlwaysOnTop = true
-                    bgui.ExtentsOffset = Vector3.new(0, 3, 0)
-                    local tl = Instance.new("TextLabel", bgui)
-                    tl.BackgroundTransparency = 1
-                    tl.Size = UDim2.new(1, 0, 1, 0)
-                    tl.Text = p.DisplayName .. " (@" .. p.Name .. ")"
-                    tl.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    tl.TextScaled = true
-                end
-            end
-        end
-    else
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character then
-                if p.Character:FindFirstChild("ESPHighlight") then p.Character.ESPHighlight:Destroy() end
-                if p.Character.Head:FindFirstChild("ESPName") then p.Character.Head.ESPName:Destroy() end
-            end
-        end
-    end
-end)
-
--- 無限ジャンプ
-UserInputService.JumpRequest:Connect(function()
-    if State.InfiniteJump then
-        local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum:ChangeState("Jumping") end
-        end
-    end
-end)
-
--- ==========================================
--- GUI構築
--- ==========================================
-local PlayerTab = Window:MakeTab({ Name = "プレイヤー", Icon = "rbxassetid://4483327233" })
-PlayerTab:AddSection({ Name = "高度な移動" })
-PlayerTab:AddToggle({ Name = "フライ", Default = false, Callback = function(v) State.FlyEnabled = v end})
-PlayerTab:AddSlider({ Name = "フライ速度", Min = 10, Max = 200, Default = 50, Callback = function(v) State.FlySpeed = v end})
-PlayerTab:AddToggle({ Name = "CFrameスピード", Default = false, Callback = function(v) State.CFrameSpeed = v end})
-PlayerTab:AddSlider({ Name = "速度倍率", Min = 1, Max = 10, Default = 2, Callback = function(v) State.SpeedMultiplier = v end})
-PlayerTab:AddToggle({ Name = "無限ジャンプ", Default = false, Callback = function(v) State.InfiniteJump = v end})
-PlayerTab:AddSection({ Name = "特殊" })
-PlayerTab:AddToggle({ Name = "アンチエイム (Spin)", Default = false, Callback = function(v) State.AntiAim = v end})
-
-local ESPTab = Window:MakeTab({ Name = "ESP", Icon = "rbxassetid://4483345998" })
-ESPTab:AddToggle({ Name = "プレイヤーESP", Default = false, Callback = function(v) State.ESPEnabled = v end })
-ESPTab:AddToggle({ Name = "X-ray (壁透視)", Default = false, Callback = function(v) 
-    State.XrayEnabled = v
-    for _, part in pairs(Workspace:GetDescendants()) do
-        if part:IsA("BasePart") and not part.Parent:FindFirstChild("Humanoid") then
-            if v then
-                if not XrayParts[part] then XrayParts[part] = part.Transparency end
-                part.Transparency = 0.5
-            else
-                if XrayParts[part] then part.Transparency = XrayParts[part]; XrayParts[part] = nil end
-            end
-        end
-    end
-end })
-
-local GrabTab = Window:MakeTab({ Name = "掴む", Icon = "rbxassetid://73570431850302" })
-GrabTab:AddToggle({ Name = "投げる有効化", Default = false, Callback = function(v) nageruEnabled = v end })
-GrabTab:AddSlider({ Name = "投げる強さ", Min = 300, Max = 4000, Default = 400, Callback = function(v) nageru = v end })
-GrabTab:AddSection({ Name = "特殊モード (プレイヤー)" })
-GrabTab:AddToggle({ Name = "キル掴む", Default = false, Callback = function(v) GrabMode.Kill = v end })
-GrabTab:AddToggle({ Name = "Kick Grab", Default = false, Callback = function(v) GrabMode.Kick = v end })
-GrabTab:AddToggle({ Name = "Void Grab", Default = false, Callback = function(v) GrabMode.Void = v end })
-GrabTab:AddToggle({ Name = "上に上がる掴む", Default = false, Callback = function(v) GrabMode.Sky = v end })
-GrabTab:AddToggle({ Name = "下に下がる掴む", Default = false, Callback = function(v) GrabMode.Down = v end })
-GrabTab:AddToggle({ Name = "ノクリップ掴む", Default = false, Callback = function(v) GrabMode.Noclip = v end })
-GrabTab:AddSection({ Name = "特殊モード (オブジェクト)" })
-GrabTab:AddToggle({ Name = "Anchor Grab (離すと固定)", Default = false, Callback = function(v) GrabMode.Anchor = v end })
-
-local AntiTab = Window:MakeTab({ Name = "アンチ", Icon = "rbxassetid://7734068321" })
-AntiTab:AddToggle({ Name = "アンチ掴み有効化", Default = false, Callback = function(v) State.AntiGrabEnabled = v end })
-
-local MiscTab = Window:MakeTab({ Name = "その他", Icon = "rbxassetid://4483345998" })
-MiscTab:AddButton({ Name = "UIを閉じる", Callback = function() OrionLib:Destroy() end })
-
-OrionLib:Init()
+MainTab:CreateButton({
+    Name = "Abort All Loops",
+    Callback = function()
+        State.Active = false
+        Rayfield:Notify({Title = "ABORTED", Content = "Standing by.", Duration = 2})
+    end,
+})
