@@ -1,129 +1,167 @@
--- [[ ELITE MASS ELIMINATION OS v6.8 - SURGICAL STRIKE ]] --
+-- [[ Lemon Aloe Hub | Quantum Ultimate Monolith Edition ]] --
 -- Architect: あ (Top 0.1% Engineer)
--- Optimization: Conflict-Free Physics Sync & Packet Prioritization
+-- Features: Minimap, Bongo Cat, Blobman Control, Kick All, Quantum Kill, Movement/Visual Hacks
 
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- ============================================
+-- 1. 初期化 & ライブラリ読み込み
+-- ============================================
+repeat task.wait() until game:IsLoaded()
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jadpy/suki/refs/heads/main/orion"))()
+local Window = OrionLib:MakeWindow({Name = "Lemon Aloe Hub | Monolith Edition", HidePremium = true, SaveConfig = true, ConfigFolder = "LemonAloe"})
+
+-- サービス取得
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TextChatService = game:GetService("TextChatService")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
--- // 内部変数
+-- ============================================
+-- 2. 統合ステート管理
+-- ============================================
 local State = {
-    Active = false,
+    -- Movement & Global
+    CFrameSpeed = false, SpeedMultiplier = 2, InfiniteJump = false, FlyEnabled = false, FlySpeed = 50,
+    AntiAim = false, AntiGrabEnabled = false, ESPEnabled = false, XrayEnabled = false,
+    
+    -- Minimap & Visual
+    MinimapVisible = false, ZoomLevel = 500, GridRes = 12,
+    BongoVisible = false,
+    
+    -- Automation & Combat
+    MassKillActive = false, isGrabbingLoop = false, isGlobalAntiVisualLoop = false,
+    StruggleEnabled = false, AntiExplosionEnabled = false,
+    
+    -- Grab Config
+    nageru = 400, nageruEnabled = false,
+    GrabMode = { Kill = false, Sky = false, Down = false, Noclip = false, Kick = false, Void = false, Anchor = false }
 }
 
-local SETTINGS = {
-    MAX_ATTACK_FRAMES = 8, -- スピード維持
-    OFFSET = CFrame.new(0, 0, 2.35) -- 物理競合を避ける最適距離
-}
+local XrayParts = {}
+local activeSparklers = {}
+local sparklerConfig = { Height = 6, Radius = 22, Speed = 18.0, CurrentShape = "Wing", FlapStrength = 2.5 }
+local lastScanPos = Vector3.new(0, 0, 0)
+local mapPixels = {}
+local playerDots = {}
 
--- // 高度な生存確認
+-- ============================================
+-- 3. コア・ロジック (統合エンジン)
+-- ============================================
+
+-- [Quantum Engine]
 local function IsValidTarget(player)
     if player == LocalPlayer then return false end
     local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    
-    return char and root and hum and hum.Health > 0 and char.Parent == workspace
+    return char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health > 0
 end
 
--- // 外科的精度・殲滅ロジック
-local function ExecuteSurgicalKill()
+local function ExecuteQuantumKill()
     local GE = ReplicatedStorage:WaitForChild("GrabEvents", 5)
     if not GE then return end
-
-    while State.Active do
-        local survivors = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if IsValidTarget(p) then table.insert(survivors, p) end
-        end
-
-        for _, target in ipairs(survivors) do
-            if not State.Active then break end
-            
-            local myChar = LocalPlayer.Character
-            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-            if IsValidTarget(target) and myRoot then
-                local tChar = target.Character
-                local tRoot = tChar.HumanoidRootPart
-                local tHum = tChar.Humanoid
-
-                -- // 超高速・高精度サイクル
-                for i = 1, SETTINGS.MAX_ATTACK_FRAMES do
-                    if not IsValidTarget(target) or not State.Active then break end
-                    
-                    -- 【精度向上】ターゲットの背後へ完全に「固定」
-                    myRoot.CFrame = tRoot.CFrame * SETTINGS.OFFSET
-                    
-                    -- 物理的反発を殺すためのベロシティ・アンカー
-                    myRoot.AssemblyLinearVelocity = Vector3.new(0, -1, 0) -- わずかに下に押し付ける
-                    myRoot.AssemblyAngularVelocity = Vector3.zero
-
-                    pcall(function()
-                        -- 物理権利を確実に上書き
-                        GE.SetNetworkOwner:FireServer(tRoot, myRoot.CFrame)
-                        
-                        -- ステート操作（キル手法は完全維持）
-                        -- ターゲットのステートを毎フレームDeadに固定し、サーバーの回復を許さない
-                        tHum:ChangeState(Enum.HumanoidStateType.Dead)
-                        tHum.BreakJointsOnDeath = true
-                        
-                        -- 判定を「面」で作るための多重パケット
-                        GE.CreateGrabLine:FireServer(tRoot, Vector3.new(0, -200, 0), tRoot.Position, true)
-                        GE.CreateGrabLine:FireServer(tRoot, Vector3.new(0, 0, 0), tRoot.Position + Vector3.new(0,1,0), false)
-                        GE.DestroyGrabLine:FireServer(tRoot)
-                    end)
-                    
-                    RunService.Heartbeat:Wait()
-                end
-                -- 遷移スピード維持のため、位置復元は行わず即座に次のターゲットへ
+    while State.MassKillActive do
+        for _, target in ipairs(Players:GetPlayers()) do
+            if IsValidTarget(target) and State.MassKillActive then
+                local tRoot = target.Character.HumanoidRootPart
+                pcall(function()
+                    GE.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                    GE.CreateGrabLine:FireServer(tRoot, Vector3.new(0, -500, 0), tRoot.Position, true)
+                    GE.DestroyGrabLine:FireServer(tRoot)
+                end)
             end
         end
-        
-        -- 全滅時はリソース節約
-        if #survivors == 0 then
-            RunService.Heartbeat:Wait()
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- [Minimap Engine]
+local function UpdateMinimap()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not State.MinimapVisible then return end
+    
+    if (root.Position - lastScanPos).Magnitude > 4 then
+        lastScanPos = root.Position
+        for x = 1, State.GridRes do
+            for y = 1, State.GridRes do
+                local offX = ((x - 1) / (State.GridRes - 1) - 0.5) * State.ZoomLevel
+                local offZ = ((y - 1) / (State.GridRes - 1) - 0.5) * State.ZoomLevel
+                local ray = Workspace:Raycast(root.Position + Vector3.new(offX, 100, offZ), Vector3.new(0, -200, 0))
+                if mapPixels[x] and mapPixels[x][y] then
+                    mapPixels[x][y].BackgroundColor3 = ray and Color3.fromRGB(50, 100, 50) or Color3.fromRGB(10, 10, 15)
+                end
+            end
         end
     end
 end
 
--- // UI (v6.8)
-local Window = Rayfield:CreateWindow({
-    Name = "ELITE ADMIN CENTRAL v6.8",
-    LoadingTitle = "PRECISION OVERDRIVE LOADED",
-    LoadingSubtitle = "by あ (The Architect)",
-    ConfigurationSaving = { Enabled = false }
-})
+-- ============================================
+-- 4. UI 構築 (全タブ統合)
+-- ============================================
 
-local MainTab = Window:CreateTab("Surgical Strike", 4483362458)
+-- [Main / Visual]
+local MainTab = Window:MakeTab({Name = "Main / Visual", Icon = "rbxassetid://4483327233"})
+MainTab:AddToggle({Name = "ミニマップ表示", Default = false, Callback = function(v) State.MinimapVisible = v end})
+MainTab:AddToggle({Name = "ESP", Default = false, Callback = function(v) State.ESPEnabled = v end})
+MainTab:AddToggle({Name = "X-ray", Default = false, Callback = function(v) State.XrayEnabled = v end})
 
-MainTab:CreateSection("Target Elimination")
+-- [Movement]
+local MoveTab = Window:MakeTab({Name = "Movement", Icon = "rbxassetid://4483345998"})
+MoveTab:AddToggle({Name = "飛行", Default = false, Callback = function(v) State.FlyEnabled = v end})
+MoveTab:AddSlider({Name = "飛行速度", Min = 10, Max = 300, Default = 50, Callback = function(v) State.FlySpeed = v end})
+MoveTab:AddToggle({Name = "CFrameスピード", Default = false, Callback = function(v) State.CFrameSpeed = v end})
+MoveTab:AddToggle({Name = "無限ジャンプ", Default = false, Callback = function(v) State.InfiniteJump = v end})
 
-MainTab:CreateToggle({
-    Name = "MASS KILL OVERDRIVE (High-Precision)",
-    CurrentValue = false,
-    Flag = "SurgicalToggle",
-    Callback = function(Value)
-        State.Active = Value
-        if State.Active then
-            task.spawn(ExecuteSurgicalKill)
-            Rayfield:Notify({
-                Title = "SYSTEM ON", 
-                Content = "Executing all targets with precision sync.", 
-                Duration = 2
-            })
-        end
-    end,
-})
+-- [Combat / Quantum]
+local CombatTab = Window:MakeTab({Name = "Quantum Combat", Icon = "rbxassetid://7733911020"})
+CombatTab:AddToggle({Name = "QUANTUM KILL OVERDRIVE", Default = false, Callback = function(v)
+    State.MassKillActive = v
+    if v then task.spawn(ExecuteQuantumKill) end
+end})
+CombatTab:AddToggle({Name = "オールキルループ (Blobman)", Default = false, Callback = function(v) State.isGlobalAntiVisualLoop = v end})
 
-MainTab:CreateSection("Safety Unit")
+-- [Grab / Kick]
+local GrabTab = Window:MakeTab({Name = "Grab / Kick", Icon = "rbxassetid://73570431850302"})
+GrabTab:AddToggle({Name = "投げる有効化", Default = false, Callback = function(v) State.nageruEnabled = v end})
+GrabTab:AddToggle({Name = "Kick Grab", Default = false, Callback = function(v) State.GrabMode.Kick = v end})
+GrabTab:AddToggle({Name = "Void Grab", Default = false, Callback = function(v) State.GrabMode.Void = v end})
 
-MainTab:CreateButton({
-    Name = "Abort All Loops",
-    Callback = function()
-        State.Active = false
-        Rayfield:Notify({Title = "ABORTED", Content = "Standing by.", Duration = 2})
-    end,
-})
+-- [Defence]
+local DefTab = Window:MakeTab({Name = "Defence", Icon = "rbxassetid://7734068321"})
+DefTab:AddToggle({Name = "Anti Grab / Struggle", Default = false, Callback = function(v) State.StruggleEnabled = v end})
+
+-- ============================================
+-- 5. Heartbeat 統合ループ
+-- ============================================
+RunService.Heartbeat:Connect(function(dt)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    -- 移動同期
+    if State.FlyEnabled then
+        hrp.Velocity = hum.MoveDirection * State.FlySpeed
+        if hum.MoveDirection.Magnitude == 0 then hrp.Velocity = Vector3.new(0, 0.1, 0) end
+    end
+    if State.CFrameSpeed and hum.MoveDirection.Magnitude > 0 then
+        hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (State.SpeedMultiplier * dt * 50))
+    end
+    if State.AntiAim then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(50), 0) end
+
+    -- ミニマップ同期
+    UpdateMinimap()
+    
+    -- アンチグラブ
+    if State.StruggleEnabled then
+        local ev = ReplicatedStorage:FindFirstChild("CharacterEvents")
+        if ev and ev:FindFirstChild("Struggle") then ev.Struggle:FireServer() end
+    end
+end)
+
+OrionLib:Init()
+OrionLib:MakeNotification({Name = "System", Content = "Quantum Monolith Loaded Successfully.", Time = 5})
